@@ -1,0 +1,75 @@
+common:
+    lid_topic:  "/livox/lidar"
+    imu_topic:  "/livox/imu"
+    time_sync_en: false         # ONLY turn on when external time synchronization is really not possible
+    time_offset_lidar_to_imu: 0.0 # Time offset between lidar and IMU calibrated by other algorithms, e.g. LI-Init (can be found in README).
+                                  # This param will take effect no matter what time_sync_en is. So if the time offset is not known exactly, please set as 0.0
+
+preprocess:
+    lidar_type: 1                # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR, 
+    scan_line: 6
+    blind: 4
+
+mapping:
+    acc_cov: 0.1
+    gyr_cov: 0.1
+    b_acc_cov: 0.0001
+    b_gyr_cov: 0.0001
+    fov_degree:    90
+    det_range:     450.0
+    extrinsic_est_en:  false      # true: enable the online estimation of IMU-LiDAR extrinsic
+    extrinsic_T: [ 0.04165, 0.02326, -0.0284 ]
+    extrinsic_R: [ 1, 0, 0,
+                   0, 1, 0,
+                   0, 0, 1]
+
+publish:
+    path_en:  false
+    scan_publish_en:  true       # false: close all the point cloud output
+    dense_publish_en: true       # false: low down the points number in a global-frame point clouds scan.
+    scan_bodyframe_pub_en: true  # true: output the point cloud scans in IMU-body-frame
+
+pcd_save:
+    pcd_save_en: true
+    interval: -1                 # how many LiDAR frames saved in each pcd file; 
+                                 # -1 : all frames will be saved in ONE pcd file, may lead to memory crash when having too much frames.
+
+ivox:
+    resolution: 0.5
+    nearby_type: 26
+
+STD:
+    lidar_topic : "/cloud_registered_body"
+    odom_topic :  "/Odometry"
+    oriTraj_path : "/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/Log/oriTran_path.tum"
+    optTraj_path : "/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/Log/optTran_path.tum"
+    lio_weight : 0.0001
+    std_weight : 0.01
+    # pre process
+    ds_size: 0.25 #0.25
+    maximum_corner_num: 500
+    # key points
+    plane_detection_thre: 0.01
+    plane_merge_normal_thre: 0.1
+    voxel_size: 1
+    voxel_init_num: 10
+    proj_image_resolution: 0.25 #0.25
+    proj_dis_min: 0
+    proj_dis_max: 5
+    corner_thre: 10
+    # std descriptor
+    descriptor_near_num: 15
+    descriptor_min_len: 2
+    descriptor_max_len: 30
+    non_max_suppression_radius: 2
+    std_side_resolution: 0.2
+    # candidate search
+    skip_near_num: 50
+    candidate_num: 50
+    sub_frame_num: 10
+    vertex_diff_threshold: 0.8
+    rough_dis_threshold: 0.015
+    normal_threshold: 0.2
+    dis_threshold: 0.5
+    icp_threshold: 0.2
+
