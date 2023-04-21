@@ -192,9 +192,11 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
     //      << "current frame index:" << curFrameInd << ","
     //      << "associated frame index" << assFrameInd << endl;
 
-    // for (int i = assFrameInd + 1 - sub_frame_num_; i < curFrameInd; i++)
-    for (int i = assFrameInd; i < curFrameInd; i++)
+    for (int i = assFrameInd + 1 - sub_frame_num_; i < curFrameInd; i++)
+    // for (int i = assFrameInd; i < curFrameInd; i++)
     {
+        if (i < 0)
+            continue;
 
         ceres::Pose3d curPose, assPose;
         assPose.p = pose_vec[i].first.first;
@@ -274,6 +276,9 @@ void AddLoopClosureConstrain(ceres::Problem *problem, std::vector<std::pair<std:
     // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight);
     for (int i = 0; i < sub_frame_num_; i++)
     {
+        if (assFrameInd - i < 0)
+            continue;
+
         ceres::CostFunction *cost_function =
             ceres::LoopClosureErrorTerm::Create(pose_c2a, sqrt_information);
 
@@ -297,8 +302,8 @@ void SolveOptimizationProblem(ceres::Problem *problem)
     // options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
     options.trust_region_strategy_type = ceres::DOGLEG;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-    options.sparse_linear_algebra_library_type = ceres::EIGEN_SPARSE;
-    // options.num_threads = 4;
+    options.sparse_linear_algebra_library_type = ceres::SUITE_SPARSE;
+    options.num_threads = 4;
 
     ceres::Solver::Summary summary;
 
@@ -309,8 +314,10 @@ void SolveOptimizationProblem(ceres::Problem *problem)
                                                                           timeSloevBegin_)
                     .count() *
                 1000;
-    std::cout << "[CeresSolveTime]:" << time << "ms" << endl;
     std::cout << summary.FullReport() << '\n';
+    std::cout << "[CeresSolveTime]:" << time << "ms" << endl;
+    // problem->RemoveParameterBlock();
+    // problem->RemoveResidualBlock();
 }
 
 void SaveTrajOpt(const std::string &traj_file)
@@ -380,7 +387,7 @@ void SaveOptPcd()
             }
             wait_pub += pcl_wait_pub[i];
         }
-        string file_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/PCD/optscans.pcd");
+        string file_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST-lio-withSTD/PCD/optscans.pcd");
         pcl::PCDWriter pclSave;
         pclSave.writeBinary(file_name, wait_pub);
     }
@@ -403,11 +410,11 @@ void SavePclComp(const int curFrameInd, const int assFrameInd, const std::pair<E
     double timeNow = ros::Time::now().toSec();
     auto time1 = to_string(timeNow);
 
-    string file_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/PCD/" + time1 + "_ass.pcd");
+    string file_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST-lio-withSTD/PCD/" + time1 + "_ass.pcd");
     pcl::PCDWriter pclSave;
     pclSave.writeBinary(file_name, pcl_save);
 
-    string optfile_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/PCD/" + time1 + "_cur.pcd");
+    string optfile_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST-lio-withSTD/PCD/" + time1 + "_cur.pcd");
     pcl::PCDWriter optpclSave;
     optpclSave.writeBinary(optfile_name, optpcl_save);
 }
@@ -477,12 +484,12 @@ int main(int argc, char **argv)
         if (package_date())
         {
             auto pose_pkg = std::pair<std::pair<Eigen::Vector3d, Eigen::Quaterniond>, double>(data_pkg.first, odom_rcv_time);
-            pose_vec_wo_opt.push_back(pose_pkg);
-            pose_vec.push_back(pose_pkg);
+            pose_vec_wo_opt.emplace_back(pose_pkg);
+            pose_vec.emplace_back(pose_pkg);
             Eigen::Vector3d translation = data_pkg.first.first;
             Eigen::Matrix3d rotation = data_pkg.first.second.toRotationMatrix();
             pcl::PointCloud<pcl::PointXYZI> cloud = *data_pkg.second;
-            pcl_wait_pub.push_back(*data_pkg.second);
+            pcl_wait_pub.emplace_back(*data_pkg.second);
 
             for (int i = 0; i < cloud.size(); i++)
             {
@@ -513,7 +520,7 @@ int main(int argc, char **argv)
                 std::vector<STDesc> stds_vec;
                 std_manager->GenerateSTDescs(temp_cloud, stds_vec);
                 auto t_descriptor_end = std::chrono::high_resolution_clock::now();
-                descriptor_time.push_back(
+                descriptor_time.emplace_back(
                     time_inc(t_descriptor_end, t_descriptor_begin));
 
                 /**
@@ -540,7 +547,7 @@ int main(int argc, char **argv)
                               << loop_transform.second << endl;
                 }
                 auto t_query_end = std::chrono::high_resolution_clock::now();
-                querying_time.push_back(time_inc(t_query_end, t_query_begin));
+                querying_time.emplace_back(time_inc(t_query_end, t_query_begin));
 
                 /**
                  * @brief step3 Add descriptors to the database
@@ -549,7 +556,7 @@ int main(int argc, char **argv)
                 auto t_map_update_begin = std::chrono::high_resolution_clock::now();
                 std_manager->AddSTDescs(stds_vec);
                 auto t_map_update_end = std::chrono::high_resolution_clock::now();
-                update_time.push_back(time_inc(t_map_update_end, t_map_update_begin));
+                update_time.emplace_back(time_inc(t_map_update_end, t_map_update_begin));
                 std::cout << "[Time] descriptor extraction: "
                           << time_inc(t_descriptor_end, t_descriptor_begin) << "ms, "
                           << "query: " << time_inc(t_query_end, t_query_begin)
@@ -562,7 +569,7 @@ int main(int argc, char **argv)
                 pcl::PointCloud<pcl::PointXYZI> save_key_cloud;
                 save_key_cloud = *temp_cloud;
 
-                std_manager->key_cloud_vec_.push_back(save_key_cloud.makeShared());
+                std_manager->key_cloud_vec_.emplace_back(save_key_cloud.makeShared());
 
                 sensor_msgs::PointCloud2 pub_cloud;
                 pcl::toROSMsg(*temp_cloud, pub_cloud);
@@ -574,6 +581,9 @@ int main(int argc, char **argv)
 
                 if (search_result.first > 0 && search_result.second > 0.5)
                 {
+                    std_manager->PlaneGeomrtricIcp(std_manager->plane_cloud_vec_.back(),
+                                                   std_manager->plane_cloud_vec_[search_result.first],
+                                                   loop_transform);
                     triggle_loop_num++;
                     pcl::toROSMsg(*std_manager->key_cloud_vec_[search_result.first],
                                   pub_cloud);
@@ -595,7 +605,7 @@ int main(int argc, char **argv)
                     AddLoopClosureConstrain(&problem, pose_vec, cloudInd, search_result.first * config_setting.sub_frame_num_, config_setting.sub_frame_num_, loop_transform, search_result.second);
                     // AddLoopClosureConstrain2(&problem, pose_vec, cloudInd, search_result.first * config_setting.sub_frame_num_, loop_transform, search_result.second);
 
-                    SavePclComp(keyCloudInd, search_result.first, loop_transform);
+                    // SavePclComp(keyCloudInd, search_result.first, loop_transform);
                     SolveOptimizationProblem(&problem);
                 }
 

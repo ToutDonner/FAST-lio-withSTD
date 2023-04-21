@@ -602,7 +602,7 @@ int main(int argc, char **argv)
             }
             wait_pub += pcl_wait_pub[i];
         }
-        string file_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/PCD/optscans.pcd");
+        string file_name = string("/home/crz/Algorithm/FAST-LIO/src/FAST-lio-withSTD/PCD/optscans.pcd");
         pcl::PCDWriter pclSave;
         pclSave.writeBinary(file_name, wait_pub);
     }

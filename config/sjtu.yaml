@@ -41,10 +41,10 @@ ivox:
 STD:
     lidar_topic : "/cloud_registered_body"
     odom_topic :  "/Odometry"
-    oriTraj_path : "/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/Log/oriTran_path.tum"
-    optTraj_path : "/home/crz/Algorithm/FAST-LIO/src/FAST_LIO/Log/optTran_path.tum"
-    lio_weight : 0.0001
-    std_weight : 0.01
+    oriTraj_path : "/home/crz/Algorithm/FAST-LIO/src/FAST-lio-withSTD/Log/oriTran_path.tum"
+    optTraj_path : "/home/crz/Algorithm/FAST-LIO/src/FAST-lio-withSTD/Log/optTran_path.tum"
+    lio_weight : 0.01
+    std_weight : 0.001
     # pre process
     ds_size: 0.25
     maximum_corner_num: 100

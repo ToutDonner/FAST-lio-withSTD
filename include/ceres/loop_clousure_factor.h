@@ -90,6 +90,7 @@ namespace ceres
 
       // Compute the relative transformation between the two frames.
       Eigen::Quaternion<T> q_a_inverse = q_a.conjugate();
+      // Eigen::Quaternion<T> q_ab_estimated = q_b * q_a_inverse;
       Eigen::Quaternion<T> q_ab_estimated = q_b * q_a_inverse;
 
       // Represent the displacement between the two frames in the A frame.
