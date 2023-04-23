@@ -193,11 +193,10 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
     //      << "current frame index:" << curFrameInd << ","
     //      << "associated frame index" << assFrameInd << endl;
     int j = 0;
-    for (int i = assFrameInd + 1; i < curFrameInd; i++)
+    // for (int i = assFrameInd + 1; i < curFrameInd; i++)
     // for (int i = 0; i < curFrameInd; i++)
+    for (int i = 0; i < pose_vec.size() - 1; i++)
     {
-        if (i < 0)
-            continue;
 
         ceres::Pose3d curPose, assPose;
         assPose.p = pose_vec[i].first.first;
@@ -218,8 +217,8 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
         pose_c2a.q = assPose.q.conjugate() * curPose.q;
         pose_c2a.q.normalize();
 
-        // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight).llt().matrixL();
-        const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight);
+        const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight).llt().matrixL();
+        // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight);
 
         ceres::CostFunction *cost_function =
             ceres::PoseGraph3dErrorTerm::Create(pose_c2a, sqrt_information);
@@ -242,10 +241,10 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
         //     j++;
         // }
     }
-    // for (int k = 0; k < 3; k++)
+    // for (int k = 1; k < 2; k++)
     // {
-    problem->SetParameterBlockConstant(pose_vec[assFrameInd + 1].first.first.data());
-    problem->SetParameterBlockConstant(pose_vec[assFrameInd + 1].first.second.coeffs().data());
+    problem->SetParameterBlockConstant(pose_vec[0].first.first.data());
+    problem->SetParameterBlockConstant(pose_vec[0].first.second.coeffs().data());
     // }
     // problem->SetParameterBlockConstant(pose_vec[assFrameInd - sub_frame_num_ + 1].first.first.data());
     // problem->SetParameterBlockConstant(pose_vec[assFrameInd - sub_frame_num_ + 1].first.second.coeffs().data());
@@ -285,8 +284,8 @@ void AddLoopClosureConstrain(ceres::Problem *problem, std::vector<std::pair<std:
 
     // problem->AddParameterBlock((pose_vec[curFrameInd].first.first.data()), 3);
     // problem->AddParameterBlock((pose_vec[curFrameInd].first.second.coeffs().data()), 4, local_parameter);
-    // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight).llt().matrixL();
-    const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight);
+    const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight).llt().matrixL();
+    // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight);
     for (int i = 1; i <= sub_frame_num_; i++)
     {
         // if (assFrameInd - i < 0)
@@ -307,7 +306,74 @@ void AddLoopClosureConstrain(ceres::Problem *problem, std::vector<std::pair<std:
                              quaternion_manifold);
     }
 }
+void AddRelativePoseConstrain(ceres::Problem *problem, const int cloudInd)
+{
+    // ceres::LossFunction *loss_function = new ceres::HuberLoss(0.1);
+    ceres::LossFunction *loss_function = nullptr;
+    ceres::Manifold *quaternion_manifold = new ceres::EigenQuaternionManifold;
+    // ceres::LocalParameterization *local_parameter;
+    // cout << "[Ceres info]:"
+    //      << "current frame index:" << curFrameInd << ","
+    //      << "associated frame index" << assFrameInd << endl;
+    int j = 0;
+    // for (int i = assFrameInd + 1; i < curFrameInd; i++)
+    // for (int i = 0; i < curFrameInd; i++)
 
+    ceres::Pose3d curPose, assPose;
+    assPose.p = pose_vec[cloudInd - 1].first.first;
+    assPose.q = pose_vec[cloudInd - 1].first.second;
+    assPose.q = assPose.q.normalized();
+
+    curPose.p = pose_vec[cloudInd].first.first;
+    curPose.q = pose_vec[cloudInd].first.second;
+    curPose.q = curPose.q.normalized();
+
+    // cout << "[Ceres info]:" << assFrameInd << " " << assPose.p.transpose() << "," << assPose.q.coeffs().transpose() << endl;
+    /**
+     * @brief current frame 和 associated frame的相对位置变换
+     *
+     */
+    ceres::Pose3d pose_c2a;
+    pose_c2a.p = assPose.q.conjugate() * (curPose.p - assPose.p);
+    pose_c2a.q = assPose.q.conjugate() * curPose.q;
+    pose_c2a.q.normalize();
+
+    const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight).llt().matrixL();
+    // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight);
+
+    ceres::CostFunction *cost_function =
+        ceres::PoseGraph3dErrorTerm::Create(pose_c2a, sqrt_information);
+
+    problem->AddResidualBlock(cost_function,
+                              loss_function,
+                              pose_vec[cloudInd - 1].first.first.data(),
+                              pose_vec[cloudInd - 1].first.second.coeffs().data(),
+                              pose_vec[cloudInd].first.first.data(),
+                              pose_vec[cloudInd].first.second.coeffs().data());
+    problem->SetManifold(pose_vec[cloudInd - 1].first.second.coeffs().data(),
+                         quaternion_manifold);
+    problem->SetManifold(pose_vec[cloudInd].first.second.coeffs().data(),
+                         quaternion_manifold);
+
+    // if (j < 5)
+    // {
+    //     problem->SetParameterBlockConstant(pose_vec[i].first.first.data());
+    //     problem->SetParameterBlockConstant(pose_vec[i].first.second.coeffs().data());
+    //     j++;
+    // }
+
+    // for (int k = 1; k < 2; k++)
+    // {
+    if (cloudInd == 1)
+    {
+        problem->SetParameterBlockConstant(pose_vec[cloudInd - 1].first.first.data());
+        problem->SetParameterBlockConstant(pose_vec[cloudInd - 1].first.second.coeffs().data());
+    }
+    // }
+    // problem->SetParameterBlockConstant(pose_vec[assFrameInd - sub_frame_num_ + 1].first.first.data());
+    // problem->SetParameterBlockConstant(pose_vec[assFrameInd - sub_frame_num_ + 1].first.second.coeffs().data());
+    // pose_constant.emplace_back(assFrameInd - sub_frame_num_ + 1);
+}
 void SolveOptimizationProblem(ceres::Problem *problem)
 {
     ceres::Solver::Options options;
@@ -470,6 +536,9 @@ int main(int argc, char **argv)
         nh.advertise<sensor_msgs::PointCloud2>("/cloud_matched_key_points", 100);
     ros::Publisher pubSTD =
         nh.advertise<visualization_msgs::MarkerArray>("descriptor_line", 10);
+
+    ros::Publisher pubOdomAftOptted =
+        nh.advertise<nav_msgs::Odometry>("/aft_optted", 10);
     /**
      * @brief STD para
      *
@@ -496,6 +565,7 @@ int main(int argc, char **argv)
     ros::Rate rate(5000);
     bool status = ros::ok();
     bool first_state = true;
+    ceres::Problem problem;
 
     while (status)
     {
@@ -504,7 +574,6 @@ int main(int argc, char **argv)
         ros::spinOnce();
         if (package_date())
         {
-            ceres::Problem problem;
             auto pose_pkg = std::pair<std::pair<Eigen::Vector3d, Eigen::Quaterniond>, double>(data_pkg.first, odom_rcv_time);
             pose_vec_wo_opt.emplace_back(pose_pkg);
             pose_vec.emplace_back(pose_pkg);
@@ -524,10 +593,10 @@ int main(int argc, char **argv)
             {
                 temp_cloud->points.push_back(pv);
             }
-            // if (cloudInd != 0)
-            // {
-            //     AddRelativePoseConstrain(&problem, cloudInd);
-            // }
+            if (cloudInd != 0)
+            {
+                AddRelativePoseConstrain(&problem, cloudInd);
+            }
 
             /**
              * @brief 判断：如果是关键帧，进行PGO，如果不是关键帧，则添加位资节点
@@ -628,30 +697,44 @@ int main(int argc, char **argv)
                      * @brief add loop closure constrain
                      *
                      */
-                    BuildOptimizationProblem(&problem, pose_vec, cloudInd, search_result.first * config_setting.sub_frame_num_, config_setting.sub_frame_num_);
+                    // BuildOptimizationProblem(&problem, pose_vec, cloudInd, search_result.first * config_setting.sub_frame_num_, config_setting.sub_frame_num_);
                     AddLoopClosureConstrain(&problem, pose_vec, cloudInd, search_result.first * config_setting.sub_frame_num_, config_setting.sub_frame_num_, loop_transform, search_result.second);
-                    // AddLoopClosureConstrain2(&problem, pose_vec, cloudInd, search_result.first * config_setting.sub_frame_num_, loop_transform, search_result.second);
 
                     // SavePclComp(keyCloudInd, search_result.first, loop_transform);
-                    SolveOptimizationProblem(&problem);
                 }
 
                 temp_cloud->clear();
                 keyCloudInd++;
                 loop.sleep();
             }
+            SolveOptimizationProblem(&problem);
 
             nav_msgs::Odometry odom;
             odom.header.frame_id = "camera_init";
-            odom.pose.pose.position.x = translation[0];
-            odom.pose.pose.position.y = translation[1];
-            odom.pose.pose.position.z = translation[2];
-            Eigen::Quaterniond q(rotation);
-            odom.pose.pose.orientation.w = q.w();
-            odom.pose.pose.orientation.x = q.x();
-            odom.pose.pose.orientation.y = q.y();
-            odom.pose.pose.orientation.z = q.z();
+            odom.pose.pose.position.x = pose_vec_wo_opt.back().first.first.x();
+            odom.pose.pose.position.y = pose_vec_wo_opt.back().first.first.y();
+            odom.pose.pose.position.z = pose_vec_wo_opt.back().first.first.z();
+            odom.pose.pose.orientation.w = pose_vec_wo_opt.back().first.second.w();
+            odom.pose.pose.orientation.x = pose_vec_wo_opt.back().first.second.x();
+            odom.pose.pose.orientation.y = pose_vec_wo_opt.back().first.second.y();
+            odom.pose.pose.orientation.z = pose_vec_wo_opt.back().first.second.z();
             pubOdomAftMapped.publish(odom);
+
+            nav_msgs::Odometry odom_;
+            odom_.header.frame_id = "camera_init";
+            odom_.pose.pose.position.x = pose_vec.back().first.first.x();
+            odom_.pose.pose.position.y = pose_vec.back().first.first.y();
+            odom_.pose.pose.position.z = pose_vec.back().first.first.z();
+
+            odom_.pose.pose.orientation.w = pose_vec.back().first.second.w();
+            odom_.pose.pose.orientation.x = pose_vec.back().first.second.x();
+            odom_.pose.pose.orientation.y = pose_vec.back().first.second.y();
+            odom_.pose.pose.orientation.z = pose_vec.back().first.second.z();
+            pubOdomAftOptted.publish(odom_);
+
+            cout << "pose z" << pose_vec.back().first.first.z()
+                 << ", pose wo opt z:" << pose_vec_wo_opt.back().first.first.z() << endl;
+
             loop.sleep();
             cloudInd++;
         }
