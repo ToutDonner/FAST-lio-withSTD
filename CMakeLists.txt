@@ -111,7 +111,7 @@ target_link_libraries(Optimization ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON
 glog gflags)
 target_include_directories(Optimization PRIVATE ${PYTHON_INCLUDE_DIRS})
 
-add_executable(Optimization_sam src/Optimization_sam.cpp src/STDesc.cpp)
-target_link_libraries(Optimization_sam ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} ${CERES_LIBRARIES}
+add_executable(online_demo src/online_demo.cpp src/STDesc.cpp)
+target_link_libraries(online_demo ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} ${CERES_LIBRARIES}
 glog gflags gtsam)
-target_include_directories(Optimization_sam PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_include_directories(online_demo PRIVATE ${PYTHON_INCLUDE_DIRS})

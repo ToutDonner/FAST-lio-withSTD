@@ -65,6 +65,7 @@ std::vector<std::pair<std::pair<Eigen::Vector3d, Eigen::Quaterniond>,
     pose_vec_wo_opt;
 
 std::vector<pcl::PointCloud<pcl::PointXYZI>> pcl_wait_pub;
+std::vector<int> pose_constant;
 
 void SigHandle(int sig)
 {
@@ -191,9 +192,9 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
     // cout << "[Ceres info]:"
     //      << "current frame index:" << curFrameInd << ","
     //      << "associated frame index" << assFrameInd << endl;
-
-    for (int i = assFrameInd + 1 - sub_frame_num_; i < curFrameInd; i++)
-    // for (int i = assFrameInd; i < curFrameInd; i++)
+    int j = 0;
+    for (int i = assFrameInd + 1; i < curFrameInd; i++)
+    // for (int i = 0; i < curFrameInd; i++)
     {
         if (i < 0)
             continue;
@@ -217,8 +218,8 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
         pose_c2a.q = assPose.q.conjugate() * curPose.q;
         pose_c2a.q.normalize();
 
-        const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight).llt().matrixL();
-        // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight);
+        // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight).llt().matrixL();
+        const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * lio_weight);
 
         ceres::CostFunction *cost_function =
             ceres::PoseGraph3dErrorTerm::Create(pose_c2a, sqrt_information);
@@ -233,10 +234,22 @@ void BuildOptimizationProblem(ceres::Problem *problem, std::vector<std::pair<std
                              quaternion_manifold);
         problem->SetManifold(pose_vec[i + 1].first.second.coeffs().data(),
                              quaternion_manifold);
-    }
 
-    problem->SetParameterBlockConstant(pose_vec[assFrameInd].first.first.data());
-    problem->SetParameterBlockConstant(pose_vec[assFrameInd].first.second.coeffs().data());
+        // if (j < 5)
+        // {
+        //     problem->SetParameterBlockConstant(pose_vec[i].first.first.data());
+        //     problem->SetParameterBlockConstant(pose_vec[i].first.second.coeffs().data());
+        //     j++;
+        // }
+    }
+    // for (int k = 0; k < 3; k++)
+    // {
+    problem->SetParameterBlockConstant(pose_vec[assFrameInd + 1].first.first.data());
+    problem->SetParameterBlockConstant(pose_vec[assFrameInd + 1].first.second.coeffs().data());
+    // }
+    // problem->SetParameterBlockConstant(pose_vec[assFrameInd - sub_frame_num_ + 1].first.first.data());
+    // problem->SetParameterBlockConstant(pose_vec[assFrameInd - sub_frame_num_ + 1].first.second.coeffs().data());
+    // pose_constant.emplace_back(assFrameInd - sub_frame_num_ + 1);
 }
 
 /**
@@ -272,25 +285,25 @@ void AddLoopClosureConstrain(ceres::Problem *problem, std::vector<std::pair<std:
 
     // problem->AddParameterBlock((pose_vec[curFrameInd].first.first.data()), 3);
     // problem->AddParameterBlock((pose_vec[curFrameInd].first.second.coeffs().data()), 4, local_parameter);
-    const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight).llt().matrixL();
-    // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight);
-    for (int i = 0; i < sub_frame_num_; i++)
+    // const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight).llt().matrixL();
+    const Eigen::Matrix<double, 6, 6> sqrt_information = (Eigen::Matrix<double, 6, 6>::Identity() * std_weight);
+    for (int i = 1; i <= sub_frame_num_; i++)
     {
-        if (assFrameInd - i < 0)
-            continue;
+        // if (assFrameInd - i < 0)
+        //     continue;
 
         ceres::CostFunction *cost_function =
             ceres::LoopClosureErrorTerm::Create(pose_c2a, sqrt_information);
 
         problem->AddResidualBlock(cost_function,
                                   loss_function,
-                                  pose_vec[assFrameInd - i].first.first.data(),
-                                  pose_vec[assFrameInd - i].first.second.coeffs().data(),
-                                  pose_vec[curFrameInd - i].first.first.data(),
-                                  pose_vec[curFrameInd - i].first.second.coeffs().data());
-        problem->SetManifold(pose_vec[assFrameInd - i].first.second.coeffs().data(),
+                                  pose_vec[assFrameInd + i].first.first.data(),
+                                  pose_vec[assFrameInd + i].first.second.coeffs().data(),
+                                  pose_vec[curFrameInd + i - sub_frame_num_].first.first.data(),
+                                  pose_vec[curFrameInd + i - sub_frame_num_].first.second.coeffs().data());
+        problem->SetManifold(pose_vec[assFrameInd + i].first.second.coeffs().data(),
                              quaternion_manifold);
-        problem->SetManifold(pose_vec[curFrameInd - i].first.second.coeffs().data(),
+        problem->SetManifold(pose_vec[curFrameInd + i - sub_frame_num_].first.second.coeffs().data(),
                              quaternion_manifold);
     }
 }
@@ -299,8 +312,8 @@ void SolveOptimizationProblem(ceres::Problem *problem)
 {
     ceres::Solver::Options options;
     options.max_num_iterations = 200;
-    // options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
-    options.trust_region_strategy_type = ceres::DOGLEG;
+    options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+    // options.trust_region_strategy_type = ceres::DOGLEG;
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.sparse_linear_algebra_library_type = ceres::SUITE_SPARSE;
     options.num_threads = 4;
@@ -314,8 +327,17 @@ void SolveOptimizationProblem(ceres::Problem *problem)
                                                                           timeSloevBegin_)
                     .count() *
                 1000;
+    // problem->SetParameterBlockVariable();
     std::cout << summary.FullReport() << '\n';
     std::cout << "[CeresSolveTime]:" << time << "ms" << endl;
+
+    // for (auto num : pose_constant)
+    // {
+    //     problem->SetParameterBlockVariable(pose_vec[num].first.first.data());
+    //     problem->SetParameterBlockVariable(pose_vec[num].first.second.coeffs().data());
+    // }
+    // pose_constant.clear();
+    // pose_constant.shrink_to_fit();
     // problem->RemoveParameterBlock();
     // problem->RemoveResidualBlock();
 }
@@ -467,9 +489,8 @@ int main(int argc, char **argv)
     ros::Rate loop(500);
     ros::Rate slow_loop(10);
 
-    int cloudInd = 0, keyCloudInd = 0, frameInd = 0;
+    int cloudInd = 0, keyCloudInd = 0, frameInd = 0, loopDetect = 5;
     StatesGroup state_last;
-    ceres::Problem problem;
 
     signal(SIGINT, SigHandle);
     ros::Rate rate(5000);
@@ -483,6 +504,7 @@ int main(int argc, char **argv)
         ros::spinOnce();
         if (package_date())
         {
+            ceres::Problem problem;
             auto pose_pkg = std::pair<std::pair<Eigen::Vector3d, Eigen::Quaterniond>, double>(data_pkg.first, odom_rcv_time);
             pose_vec_wo_opt.emplace_back(pose_pkg);
             pose_vec.emplace_back(pose_pkg);
@@ -502,6 +524,10 @@ int main(int argc, char **argv)
             {
                 temp_cloud->points.push_back(pv);
             }
+            // if (cloudInd != 0)
+            // {
+            //     AddRelativePoseConstrain(&problem, cloudInd);
+            // }
 
             /**
              * @brief 判断：如果是关键帧，进行PGO，如果不是关键帧，则添加位资节点
@@ -510,6 +536,7 @@ int main(int argc, char **argv)
             if (cloudInd % config_setting.sub_frame_num_ == 0 && cloudInd != 0)
             {
                 std::cout << "Key Frame id:" << keyCloudInd
+                          << ", ckoudInde id:" << cloudInd
                           << ", cloud size: " << temp_cloud->size() << std::endl;
 
                 /**

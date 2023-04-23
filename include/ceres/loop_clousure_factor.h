@@ -89,12 +89,14 @@ namespace ceres
       Eigen::Map<const Eigen::Quaternion<T>> q_b(q_b_ptr);
 
       // Compute the relative transformation between the two frames.
-      Eigen::Quaternion<T> q_a_inverse = q_a.conjugate();
+      Eigen::Quaternion<T>
+          q_a_inverse = q_a.conjugate();
       // Eigen::Quaternion<T> q_ab_estimated = q_b * q_a_inverse;
       Eigen::Quaternion<T> q_ab_estimated = q_b * q_a_inverse;
 
       // Represent the displacement between the two frames in the A frame.
-      Eigen::Matrix<T, 3, 1> p_ab_estimated = q_a_inverse * (p_b - p_a);
+      // Eigen::Matrix<T, 3, 1> p_ab_estimated = q_a_inverse * (p_b - p_a);
+      Eigen::Matrix<T, 3, 1> p_ab_estimated = (p_b - q_ab_estimated * p_a);
 
       // Compute the error between the two orientation estimates.
       Eigen::Quaternion<T> delta_q =
